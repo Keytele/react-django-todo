@@ -1,0 +1,34 @@
+# Python/Django specific
+__pycache__/
+*.pyc
+.env
+venv/
+env/
+*.log
+db.sqlite3
+/media/
+/static_collected/
+
+# React/Node.js specific
+node_modules/
+build/
+dist/
+.parcel-cache/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Editor/OS specific
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Sensitive files (if applicable, adjust as needed)
+*.key
+*.pem
+*.crt
