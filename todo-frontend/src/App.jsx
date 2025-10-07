@@ -1,99 +1,146 @@
-import React, { useMemo, useState } from "react";
-import Modal from "./components/Modal.jsx";
+import { useEffect, useMemo, useState, useCallback } from "react";
+import Modal from "./components/Modal";
+import axios from "axios";
 
-const initialTodos = [
-  { id: 1, title: "Go to Market", description: "Buy ingredients to prepare dinner", completed: true },
-  { id: 2, title: "Study", description: "Read Algebra and History textbook for the upcoming test", completed: false },
-  { id: 3, title: "Sammy's books", description: "Go to library to return Sammy's books", completed: true },
-  { id: 4, title: "Article", description: "Write article on how to use Django with React", completed: false },
-];
+function normalizeTodos(payload) {
+  if (Array.isArray(payload)) return payload;                     // straight array
+  if (payload?.results && Array.isArray(payload.results)) return payload.results; // DRF paginated
+  if (payload?.items && Array.isArray(payload.items)) return payload.items;       // generic "items"
+  if (payload && typeof payload === "object") {
+    const vals = Object.values(payload);
+    if (vals.every(v => v && typeof v === "object")) return vals; // keyed object -> array
+  }
+  console.warn("Unexpected todos payload shape:", payload);
+  return [];
+}
 
-export default function App() {
+function App() {
   const [viewCompleted, setViewCompleted] = useState(false);
-  const [todoList, setTodoList] = useState(initialTodos);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [activeItem, setActiveItem] = useState({ title: "", description: "", completed: false });
+  const [todoList, setTodoList] = useState([]);
+  const [modal, setModal] = useState(false);
+  const [activeItem, setActiveItem] = useState({
+    title: "",
+    description: "",
+    completed: false,
+  });
 
-  const toggle = () => setIsModalOpen(v => !v);
+  const refreshList = useCallback(async () => {
+    try {
+      const res = await axios.get("/api/todos/");
+      setTodoList(normalizeTodos(res.data));
+    } catch (err) {
+      console.error(err);
+      setTodoList([]); // keep it an array so UI doesn't crash
+    }
+  }, []);
 
-  const handleSubmit = (item) => {
-    setTodoList(list => {
-      const exists = list.some(t => t.id === item.id);
-      if (exists) return list.map(t => (t.id === item.id ? item : t));
-      const nextId = list.length ? Math.max(...list.map(t => t.id)) + 1 : 1;
-      return [...list, { ...item, id: nextId }];
-    });
+  useEffect(() => {
+    refreshList();
+  }, [refreshList]);
+
+  const toggle = () => setModal(m => !m);
+
+  const handleSubmit = async (item) => {
     toggle();
+    try {
+      if (item.id) {
+        await axios.put(`/api/todos/${item.id}/`, item);
+      } else {
+        await axios.post("/api/todos/", item);
+      }
+      await refreshList();
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  const handleDelete = (item) => setTodoList(list => list.filter(t => t.id !== item.id));
-  const createItem = () => { setActiveItem({ title: "", description: "", completed: false }); setIsModalOpen(true); };
-  const editItem = (item) => { setActiveItem(item); setIsModalOpen(true); };
+  const handleDelete = async (item) => {
+    try {
+      await axios.delete(`/api/todos/${item.id}/`);
+      await refreshList();
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
-  const filteredItems = useMemo(
-    () => todoList.filter(item => item.completed === viewCompleted),
-    [todoList, viewCompleted]
-  );
+  const createItem = () => {
+    setActiveItem({ title: "", description: "", completed: false });
+    setModal(true);
+  };
+
+  const editItem = (item) => {
+    setActiveItem({ ...item });
+    setModal(true);
+  };
+
+  // Safety: make sure we always filter an array, and coerce completed to boolean
+  const itemsToShow = useMemo(() => {
+    const list = Array.isArray(todoList) ? todoList : [];
+    return list.filter((t) => Boolean(t?.completed) === viewCompleted);
+  }, [todoList, viewCompleted]);
 
   return (
-    <main className="container py-4">
-      <h1 className="text-center my-4">Todo app</h1>
+    <main className="container">
+      <h1 className="text-white text-uppercase text-center my-4">Todo app</h1>
+      <div className="row">
+        <div className="col-md-6 col-sm-10 mx-auto p-0">
+          <div className="card p-3">
+            <div className="mb-4">
+              <button className="btn btn-primary" onClick={createItem}>
+                Add task
+              </button>
+            </div>
 
-      <div className="row justify-content-center">
-        <div className="col-12 col-md-8 col-lg-6">
-          <div className="card shadow-sm mw-100">
-            <div className="card-body mw-100">
-              <div className="mb-3">
-                <button className="btn btn-primary" onClick={createItem}>Add task</button>
-              </div>
+            <div className="nav nav-tabs">
+              <button
+                type="button"
+                onClick={() => setViewCompleted(true)}
+                className={`nav-link ${viewCompleted ? "active" : ""}`}
+              >
+                Complete
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewCompleted(false)}
+                className={`nav-link ${viewCompleted ? "" : "active"}`}
+              >
+                Incomplete
+              </button>
+            </div>
 
-              <ul className="nav nav-tabs mb-3" role="tablist">
-                <li className="nav-item" role="presentation">
-                  <button
-                    type="button"
-                    role="tab"
-                    className={`nav-link ${viewCompleted ? "active" : ""}`}
-                    onClick={() => setViewCompleted(true)}
-                  >
-                    Complete
-                  </button>
-                </li>
-                <li className="nav-item" role="presentation">
-                  <button
-                    type="button"
-                    role="tab"
-                    className={`nav-link ${!viewCompleted ? "active" : ""}`}
-                    onClick={() => setViewCompleted(false)}
-                  >
-                    Incomplete
-                  </button>
-                </li>
-              </ul>
-
-              <ul className="list-group list-group-flush">
-                {filteredItems.map(item => (
-                  <li
-                    key={item.id}
-                    className="list-group-item d-flex flex-column flex-sm-row justify-content-between align-items-start gap-2"
+            <ul className="list-group list-group-flush border-top-0">
+              {itemsToShow.map((item) => (
+                <li
+                  key={item.id ?? item._id ?? item.key ?? `${item.title}-${Math.random()}`}
+                  className="list-group-item d-flex justify-content-between align-items-center"
+                >
+                  <span
+                    className={`todo-title mr-2 ${viewCompleted ? "completed-todo" : ""}`}
                     title={item.description}
                   >
-                    <span className={`flex-grow-1 ${viewCompleted ? "text-decoration-line-through" : ""}`}>
-                      {item.title}
-                    </span>
-
-                    <div className="btn-group btn-group-sm" role="group" aria-label={`Actions for ${item.title}`}>
-                      <button className="btn btn-outline-secondary" onClick={() => editItem(item)}>Edit</button>
-                      <button className="btn btn-danger" onClick={() => handleDelete(item)}>Delete</button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </div>
+                    {item.title}
+                  </span>
+                  <span>
+                    <button className="btn btn-secondary mr-2" onClick={() => editItem(item)}>
+                      Edit
+                    </button>
+                    <button className="btn btn-danger" onClick={() => handleDelete(item)}>
+                      Delete
+                    </button>
+                  </span>
+                </li>
+              ))}
+              {itemsToShow.length === 0 && (
+                <li className="list-group-item text-muted">No tasks here yet.</li>
+              )}
+            </ul>
           </div>
         </div>
       </div>
 
-      <Modal activeItem={activeItem} isOpen={isModalOpen} toggle={toggle} onSave={handleSubmit} />
+      {modal && <Modal activeItem={activeItem} toggle={toggle} onSave={handleSubmit} />}
     </main>
   );
 }
+
+export default App;
