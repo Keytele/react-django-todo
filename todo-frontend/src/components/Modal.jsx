@@ -1,77 +1,72 @@
-import React, { useEffect, useState } from "react";
-import {
-  Button,
-  Modal as ReactstrapModal,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  Form,
-  FormGroup,
-  Input,
-  Label,
-} from "reactstrap";
+// components/Modal.jsx
+import { useEffect, useState } from "react";
 
-export default function CustomModal({ activeItem, isOpen, toggle, onSave }) {
-  const [localItem, setLocalItem] = useState(activeItem);
+export default function Modal({ activeItem, onSave, toggle }) {
+  const [item, setItem] = useState(activeItem);
 
-  // keep local state in sync if parent changes activeItem
-  useEffect(() => {
-    setLocalItem(activeItem);
-  }, [activeItem]);
+  useEffect(() => setItem(activeItem), [activeItem]);
 
   const handleChange = (e) => {
-    const { name, type, checked, value } = e.target;
-    setLocalItem(prev => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
+    const { name, value, type, checked } = e.target;
+    setItem((prev) => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onSave(item);
   };
 
   return (
-    <ReactstrapModal isOpen={isOpen} toggle={toggle}>
-      <ModalHeader toggle={toggle}>Todo Item</ModalHeader>
-      <ModalBody>
-        <Form>
-          <FormGroup>
-            <Label htmlFor="todo-title">Title</Label>
-            <Input
-              type="text"
-              id="todo-title"
+    <div className="hg-modal-backdrop" onClick={toggle} role="dialog" aria-modal="true">
+      <div className="hg-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="d-flex justify-content-between align-items-center mb-3">
+          <h2 className="h5 m-0">Task</h2>
+          <button type="button" className="btn btn-sm btn-outline-secondary" onClick={toggle}>
+            Close
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div className="mb-3">
+            <label className="form-label">Title</label>
+            <input
               name="title"
-              value={localItem.title}
+              className="form-control"
+              value={item.title}
               onChange={handleChange}
-              placeholder="Enter Todo Title"
+              required
             />
-          </FormGroup>
+          </div>
 
-          <FormGroup>
-            <Label htmlFor="todo-description">Description</Label>
-            <Input
-              type="text"
-              id="todo-description"
+          <div className="mb-3">
+            <label className="form-label">Description</label>
+            <textarea
               name="description"
-              value={localItem.description}
+              className="form-control"
+              rows={3}
+              value={item.description || ""}
               onChange={handleChange}
-              placeholder="Enter Todo description"
             />
-          </FormGroup>
+          </div>
 
-          <FormGroup check>
-            <Label check>
-              <Input
-                type="checkbox"
-                name="completed"
-                checked={!!localItem.completed}
-                onChange={handleChange}
-              />
-              {" "}Completed
-            </Label>
-          </FormGroup>
-        </Form>
-      </ModalBody>
+          <div className="form-check mb-4">
+            <input
+              id="completed"
+              type="checkbox"
+              name="completed"
+              className="form-check-input"
+              checked={!!item.completed}
+              onChange={handleChange}
+            />
+            <label htmlFor="completed" className="form-check-label">Completed</label>
+          </div>
 
-      <ModalFooter>
-        <Button color="success" onClick={() => onSave(localItem)}>
-          Save
-        </Button>
-      </ModalFooter>
-    </ReactstrapModal>
+          <div className="d-flex justify-content-end gap-2">
+            <button type="button" className="btn btn-light" onClick={toggle}>Cancel</button>
+            <button type="submit" className="btn btn-primary">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
